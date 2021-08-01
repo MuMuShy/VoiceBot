@@ -1,0 +1,3 @@
+py audio 問題解法
+pip install pipwin
+pipwin install pyaudio
