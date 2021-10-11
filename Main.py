@@ -27,12 +27,14 @@ class Main(QMainWindow, ui.Ui_MainWindow):
          self.CommandModuleThread = CommandModuleThread()
          self.ListenThread = ListenSoundWorkThread()
          self.ChatBotThread = ChatBotWorkThread()
+         self.CommandExWorkThread = CommandExWorkThread()
          self.ChatBotThread.init()
          self.ListenThread.setTerminationEnabled(True)
          self.CommandModuleThread.setTerminationEnabled(True)
          self.SpeackSoundThread.setTerminationEnabled(True)
          self.SpeackAniThread.setTerminationEnabled(True)
          self.ChatBotThread.setTerminationEnabled(True)
+         self.CommandExWorkThread.setTerminationEnabled(True)
          #terminate enable
          self.enterbtn.clicked.connect(self.onEnterClicked)
          self.speackbtn.clicked.connect(self.onSpeackClicked)
@@ -42,6 +44,7 @@ class Main(QMainWindow, ui.Ui_MainWindow):
          self.CommandModuleThread.trigger.connect(self.onResultTextRecive)
          self.SpeackAniThread.trigger.connect(self.playTalkAnimation)
          self.ChatBotThread.trigger.connect(self.showText)
+         self.CommandExWorkThread.trigger.connect(self.showTextOnly)
 
     def onSpeackClicked(self):
         print("開始聆聽...")
@@ -53,8 +56,11 @@ class Main(QMainWindow, ui.Ui_MainWindow):
         # kill thread-----
         self.ListenThread.start()
 
+    def getGlobalText(self):
+        return self.lineEdit.text()
 
     def onEnterClicked(self):
+        global GlobalText
         # kill thread-----
         self.ListenThread.stop()
         self.CommandModuleThread.stop()
@@ -62,6 +68,10 @@ class Main(QMainWindow, ui.Ui_MainWindow):
         self.SpeackAniThread.stop()
         #kill thread-----
         input = self.lineEdit.text()
+        path = 'output.txt'
+        f = open(path, 'w')
+        f.write(input)
+        f.close()
         self.CommandModuleThread.setWord(input)
         self.CommandModuleThread.start()
 
@@ -78,9 +88,14 @@ class Main(QMainWindow, ui.Ui_MainWindow):
             command = word[1]
             callback = word[2]
             print("要執行:"+command)
-
             print("call back要說:"+callback)
-            print(exec("result=" + str(command)))
+            self.SpeackSoundThread.setWord(callback)
+            self.SpeackSoundThread.start()
+            self.SpeackAniThread.setTime(3)
+            self.SpeackAniThread.start()
+
+            self.CommandExWorkThread.setCommand(command)
+            self.CommandExWorkThread.start()
         else:
             self.ChatBotThread.setWord(word[1])
             self.ChatBotThread.start()
@@ -110,6 +125,19 @@ class Main(QMainWindow, ui.Ui_MainWindow):
         self.SpeackAniThread.start()
         #thread 執行 tts
         self.resulttext.setPlainText(text)
+        self.SpeackSoundThread.setWord(text)
+        self.SpeackSoundThread.start()
+
+    def showTextOnly(self,text):
+        print("::showtext only::" + text)
+        # thread 執行 tts
+        self.resulttext.setPlainText(text)
+
+    def speackOnly(self,text):
+        # 播放動畫
+        self.SpeackAniThread.setTime(3)
+        self.SpeackAniThread.start()
+        # thread 執行 tts
         self.SpeackSoundThread.setWord(text)
         self.SpeackSoundThread.start()
 
@@ -177,7 +205,8 @@ class CommandModuleThread(QThread):
         self.commandList = dict()
         for i in range(2, ws.max_column + 1):
             self.commandList[ws.cell(row=1, column=i).value] = [ws.cell(row=3, column=i).value,
-                                                                ws.cell(row=4, column=i).value]
+                                                                ws.cell(row=4, column=i).value,
+                                                                ws.cell(row=5, column=i).value,]
         print(self.commandList)
         print("Load command...done")
 
@@ -185,16 +214,16 @@ class CommandModuleThread(QThread):
         #print("set command:"+word)
         self.command = word
 
+
     def run(self):
         talk = self.command.lower()
         print(talk)
+
         hadcommand = False
         _commandindex = 0
         for t in self.commandList.keys():
             if re.findall(t, talk):
                 # 執行excel下的指令
-                # exec(self.commandList[t][0])
-                # 講出callback
                 print(self.commandList[t][0])
                 _commandindex = t
                 hadcommand = True
@@ -205,6 +234,8 @@ class CommandModuleThread(QThread):
             print(str(self.commandList[_commandindex][0]))
             print("Call back世說:")
             print(self.commandList[_commandindex][1])
+
+
             #command + function + callback
 
             self.trigger.emit("command/"+str(self.commandList[_commandindex][0])+"/"+self.commandList[_commandindex][1])
@@ -238,6 +269,32 @@ class ChatBotWorkThread(QThread):
         result = self.ChatBot.getResponse(self.word)
         print("::chatbotModule::"+result)
         self.trigger.emit(str(result))
+
+    def stop(self):
+        self.terminate()
+
+#功能模組執行現成
+class CommandExWorkThread(QThread):
+    trigger = pyqtSignal(str)
+    def __int__(self):
+        # 初始化函数
+        super(ChatBotWorkThread, self).__init__()
+        self.command="n"
+
+    def init(self):
+        print("::CommandExWorkThread init::")
+
+    def setCommand(self,word):
+        #print("set command:"+word)
+        self.command = str(word)
+
+    def run(self):
+        result = ""
+        command = "result="+self.command
+        print("command模組收到要執行:", command)
+        exec(command)
+        print(Web.result)
+        self.trigger.emit(str(Web.result))
 
     def stop(self):
         self.terminate()

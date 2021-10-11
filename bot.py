@@ -17,6 +17,7 @@ class ChatBotClass():
 
 
     def getResponse(self,text):
+
         print(":BotCore:"+text)
         result = self.bot.get_response(text)
         print("result:"+str(result))
