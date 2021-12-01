@@ -191,6 +191,11 @@ class ListenSoundWorkThread(QThread):
         data = soundRecognizer.Listen()
         print("結果:")
         print(data)
+        input = data
+        path = 'output.txt'
+        f = open(path, 'w')
+        f.write(input)
+        f.close()
         self.trigger.emit(str(data))
     def stop(self):
         self.terminate()
